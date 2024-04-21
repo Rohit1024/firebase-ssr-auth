@@ -1,9 +1,7 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import Image from "next/image";
-import { z } from "zod";
+import { useAuth } from "@/auth/AuthContext";
+import { getFirebaseStorage } from "@/auth/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -15,13 +13,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { getAuth, updateProfile } from "firebase/auth";
+import { ref } from "firebase/storage";
+import Image from "next/image";
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 import { Icons } from "./icons";
-import { useState } from "react";
 import { ImageUpload } from "./image-upload";
-import { getStorage, ref } from "firebase/storage";
-import { getFirebaseAuth, getFirebaseStorage, getUser } from "@/auth/firebase";
-import { User } from "firebase/auth";
-import { useAuth } from "@/auth/AuthContext";
 
 const profileFormSchema = z.object({
   displayname: z
@@ -38,7 +39,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export function ProfileForm() {
   const { user } = useAuth();
-  console.log(user);
+  const [isPending, startTransition] = React.useTransition();
   const [uploadedImagePath, setUploadedImagePath] = useState(user?.photoURL);
   const imageRef = ref(getFirebaseStorage(), `profiles/${user?.uid}`);
   const form = useForm<ProfileFormValues>({
@@ -49,7 +50,19 @@ export function ProfileForm() {
     mode: "onChange",
   });
 
-  function onSubmit(data: ProfileFormValues) {}
+  function onSubmit(data: ProfileFormValues) {
+    startTransition(async () => {
+      try {
+        await updateProfile(getAuth().currentUser!, {
+          displayName: data.displayname,
+          photoURL: uploadedImagePath,
+        });
+        toast.success("Profile Updated Sucessfully");
+      } catch (error) {
+        console.log(error);
+      }
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -58,10 +71,9 @@ export function ProfileForm() {
           width={1000}
           height={1000}
           className=" shadow-md w-24 h-24 border rounded-md object-cover"
-          src={
-            uploadedImagePath ? uploadedImagePath : "/public/images/avatar.png"
-          }
+          src={uploadedImagePath ? uploadedImagePath : "/images/avatar.png"}
           alt="sample pfp"
+          priority={false}
         />
         <div className=" space-y-2">
           <h1 className=" font-semibold">Profile Picture</h1>
@@ -99,7 +111,12 @@ export function ProfileForm() {
               </FormItem>
             )}
           />
-          <Button type="submit">Update profile</Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending && (
+              <Icons.spinner className="mr-2 size-4 animate-spin" />
+            )}{" "}
+            Update profile
+          </Button>
         </form>
       </Form>
     </div>

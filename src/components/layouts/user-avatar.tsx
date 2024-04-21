@@ -16,7 +16,7 @@ export function UserAvatar({ user, ...props }: UserAvatarProps) {
       ) : (
         <AvatarFallback>
           <span className="sr-only">
-            {user.displayName ?? user.email?.at(0)?.toLocaleUpperCase()}
+            {user.displayName ?? user.email?.at(0)?.toUpperCase()}
           </span>
           <Icons.user className="h-4 w-4" />
         </AvatarFallback>

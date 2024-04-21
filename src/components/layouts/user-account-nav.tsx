@@ -51,7 +51,7 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" asChild>
-          <Link href="/profile">
+          <Link href="/dashboard/account">
             <Icons.settings className="mr-2 h-4 w-4" />
             Account
           </Link>

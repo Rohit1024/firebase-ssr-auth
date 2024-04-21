@@ -5,8 +5,10 @@ import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   getDownloadURL,
+  StorageError,
   StorageReference,
-  uploadBytes,
+  uploadBytesResumable,
+  UploadTaskSnapshot,
 } from "firebase/storage";
 import {
   Dialog,
@@ -20,8 +22,8 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import Image from "next/image";
-import { Progress } from "./ui/progress";
 import { Icons } from "./icons";
+import RadialProgress from "./ui/progress";
 import { toast } from "sonner";
 
 type UploadProps = {
@@ -36,6 +38,7 @@ export function ImageUpload({
   handleUploadedPath,
 }: UploadProps) {
   const [loading, setLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState(0);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,16 +55,46 @@ export function ImageUpload({
     setSelectedImage(null);
   };
 
-  const handleImageUpload = async (image: File) => {
+  const onUploadProgress = (snapshot: UploadTaskSnapshot) => {
+    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+    setProgress(progress);
+  };
+
+  const handleImageUpload = (image: File) => {
     if (!image) return;
     setLoading(true);
-    const uploadFile = await uploadBytes(storageRef, selectedImage!);
-    // Upload completed successfully, now we can get the download URL
-    getDownloadURL(uploadFile.ref).then((downloadURL) => {
-      console.log("File available at", downloadURL);
+    const metadata = {
+      contentType: "image/jpeg",
+    };
+    try {
+      const uploadTask = uploadBytesResumable(
+        storageRef,
+        selectedImage!,
+        metadata
+      );
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => onUploadProgress(snapshot),
+        (error) => {
+          console.log(error);
+          if (error instanceof StorageError) {
+            toast.error(error.code);
+          }
+        },
+        () => {
+          // Upload completed successfully, now we can get the download URL
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            console.log("File available at", downloadURL);
+            handleUploadedPath(downloadURL);
+          });
+        }
+      );
+    } catch (error) {
       setLoading(false);
-      handleUploadedPath(downloadURL);
-    });
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -85,7 +118,6 @@ export function ImageUpload({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className=" mb-3">Upload Profile Picture</DialogTitle>
-
           <div
             {...getRootProps()}
             className=" flex items-center justify-center w-full"
@@ -96,7 +128,7 @@ export function ImageUpload({
             >
               {loading && (
                 <div className=" text-center max-w-md  ">
-                  <Progress />
+                  <RadialProgress progress={progress} />
                   <p className=" text-sm font-semibold">Uploading Picture</p>
                   <p className=" text-xs text-gray-400">
                     Do not refresh or perform any other action while the picture
